@@ -46,28 +46,44 @@ def logout():
     st.rerun()
 
 # =========================
-# Role guard (تم التعديل هنا لحل المشكلة)
+# Role guard (تم التعديل الجذري هنا لحل كل أنواع الأخطاء)
 # =========================
 def require_role(user, allowed_roles=("admin",)):
     """
-    تتأكد من أن المستخدم يملك الصلاحية المطلوبة.
-    تتعامل مع البيانات سواء كانت قاموساً أو قائمة.
+    تتحقق من الصلاحية وتمنع الأخطاء حتى لو تم تمرير المدخلات بشكل خاطئ.
     """
+    # 1. التحقق إذا تم تبديل المدخلات بالخطأ (إذا كان المدخل الأول قائمة والثاني نص)
+    if isinstance(user, list) and isinstance(allowed_roles, str):
+        # تصحيح الخطأ تلقائياً: تبديل القيم لمكانها الصحيح
+        actual_allowed_roles = user
+        # محاولة جلب المستخدم الحالي من الجلسة بما أن الأول ليس مستخدماً
+        user = st.session_state.get("user")
+        allowed_roles = actual_allowed_roles
+
     if not user:
         st.error("يلزم تسجيل الدخول للوصول لهذه الصفحة.")
         st.stop()
 
-    # حل مشكلة AttributeError: تحويل القائمة إلى قاموس إذا لزم الأمر
+    # 2. معالجة نوع بيانات المستخدم (Dictionary vs List)
     current_user_data = user
     if isinstance(user, list):
-        current_user_data = user[0] if len(user) > 0 else {}
+        if len(user) > 0 and isinstance(user[0], dict):
+            current_user_data = user[0]
+        else:
+            st.error("بيانات المستخدم غير صالحة أو بتنسيق خاطئ.")
+            st.stop()
 
-    # التأكد من استخراج الدور (role) بأمان
+    # 3. التأكد من أننا نتعامل مع قاموس الآن
+    if not isinstance(current_user_data, dict):
+        st.error(f"خطأ برمج في تمرير البيانات: المتوقع قاموس، الموجود {type(current_user_data).__name__}")
+        st.stop()
+
+    # 4. التحقق من الدور (Role)
     role = (current_user_data.get("role") or "").strip().lower()
     allowed = tuple(r.strip().lower() for r in (allowed_roles or ()))
 
     if role not in allowed:
-        st.warning(f"ليس لديك صلاحية الوصول لهذه الصفحة. (دورك الحالي: {role})")
+        st.warning(f"ليس لديك صلاحية الوصول لهذه الصفحة. دورك: {role}")
         st.stop()
 
 # =========================
@@ -76,11 +92,9 @@ def require_role(user, allowed_roles=("admin",)):
 def login_required():
     _ensure_session()
 
-    # إذا كان المستخدم مسجلاً مسبقاً
     if st.session_state.auth.get("ok") and st.session_state.user:
         return st.session_state.user
 
-    # واجهة دخول
     apply_branding("تقدير القيمة الإيجارية للعقارات الاستثمارية")
 
     st.markdown("### 🔐 تسجيل الدخول")
@@ -99,7 +113,6 @@ def login_required():
         admin_u, admin_p = _get_admin_creds()
 
         if _constant_time_eq(username, admin_u) and _constant_time_eq(password, admin_p):
-            # تخزين البيانات كقاموس واضح
             user_info = {"username": username, "role": "admin"}
             st.session_state.auth = {"ok": True, "user": username}
             st.session_state.user = user_info
