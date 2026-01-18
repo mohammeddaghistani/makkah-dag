@@ -3,32 +3,17 @@ import hmac
 import streamlit as st
 from modules.style import apply_branding, render_footer
 
-# =========================
-# إعدادات الدخول الافتراضية
-# =========================
+# ==========================================
+# 1. إعدادات الدخول والـ Session
+# ==========================================
 def _get_admin_creds():
-    u = None
-    p = None
-    try:
-        u = st.secrets.get("ADMIN_USERNAME", None)
-        p = st.secrets.get("ADMIN_PASSWORD", None)
-    except Exception:
-        pass
+    """جلب بيانات المدير من الإعدادات السرية أو متغيرات البيئة"""
+    u = st.secrets.get("ADMIN_USERNAME", os.getenv("ADMIN_USERNAME", "admin"))
+    p = st.secrets.get("ADMIN_PASSWORD", os.getenv("ADMIN_PASSWORD", "admin"))
+    return str(u), str(p)
 
-    u = u or os.getenv("ADMIN_USERNAME", "admin")
-    p = p or os.getenv("ADMIN_PASSWORD", "admin")
-    return u, p
-
-def _constant_time_eq(a: str, b: str) -> bool:
-    try:
-        return hmac.compare_digest(a or "", b or "")
-    except Exception:
-        return (a or "") == (b or "")
-
-# =========================
-# Session helpers
-# =========================
 def _ensure_session():
+    """التأكد من تهيئة متغيرات الجلسة"""
     if "auth" not in st.session_state:
         st.session_state.auth = {"ok": False, "user": None}
     if "user" not in st.session_state:
@@ -42,84 +27,82 @@ def logout():
     _ensure_session()
     st.session_state.auth = {"ok": False, "user": None}
     st.session_state.user = None
-    st.success("تم تسجيل الخروج")
+    st.success("تم تسجيل الخروج بنجاح")
     st.rerun()
 
-# =========================
-# Role guard (تم التعديل الجذري هنا لحل كل أنواع الأخطاء)
-# =========================
+# ==========================================
+# 2. نظام الصلاحيات (منح الأدمن كافة الصلاحيات)
+# ==========================================
 def require_role(user, allowed_roles=("admin",)):
     """
-    تتحقق من الصلاحية وتمنع الأخطاء حتى لو تم تمرير المدخلات بشكل خاطئ.
+    تتحقق من صلاحية المستخدم. 
+    ملاحظة: المدير (admin) يملك صلاحية الوصول الكاملة دائماً.
     """
-    # 1. التحقق إذا تم تبديل المدخلات بالخطأ (إذا كان المدخل الأول قائمة والثاني نص)
-    if isinstance(user, list) and isinstance(allowed_roles, str):
-        # تصحيح الخطأ تلقائياً: تبديل القيم لمكانها الصحيح
-        actual_allowed_roles = user
-        # محاولة جلب المستخدم الحالي من الجلسة بما أن الأول ليس مستخدماً
-        user = st.session_state.get("user")
-        allowed_roles = actual_allowed_roles
+    # معالجة الخطأ الشائع: إذا تم تمرير الصلاحيات كأول متغير بدلاً من user
+    if isinstance(user, (list, tuple)) and not st.session_state.get("user"):
+        st.error("خطأ تقني: لم يتم التعرف على بيانات المستخدم.")
+        st.stop()
+    
+    # محاولة جلب المستخدم من الجلسة إذا كان المتغير الممرر غير صحيح
+    actual_user = user
+    if not isinstance(user, dict):
+        if isinstance(user, list) and len(user) > 0 and isinstance(user[0], dict):
+            actual_user = user[0]
+        else:
+            actual_user = st.session_state.get("user")
 
-    if not user:
+    if not actual_user:
         st.error("يلزم تسجيل الدخول للوصول لهذه الصفحة.")
         st.stop()
 
-    # 2. معالجة نوع بيانات المستخدم (Dictionary vs List)
-    current_user_data = user
-    if isinstance(user, list):
-        if len(user) > 0 and isinstance(user[0], dict):
-            current_user_data = user[0]
-        else:
-            st.error("بيانات المستخدم غير صالحة أو بتنسيق خاطئ.")
-            st.stop()
+    # استخراج الدور (role) بأمان
+    role = str(actual_user.get("role", "")).strip().lower()
 
-    # 3. التأكد من أننا نتعامل مع قاموس الآن
-    if not isinstance(current_user_data, dict):
-        st.error(f"خطأ برمج في تمرير البيانات: المتوقع قاموس، الموجود {type(current_user_data).__name__}")
-        st.stop()
-
-    # 4. التحقق من الدور (Role)
-    role = (current_user_data.get("role") or "").strip().lower()
-    allowed = tuple(r.strip().lower() for r in (allowed_roles or ()))
-
+    # --- القاعدة الذهبية: الأدمن يدخل كل مكان ---
+    if role == "admin":
+        return True 
+    
+    # التحقق لبقية الأدوار
+    allowed = [str(r).strip().lower() for r in (allowed_roles or ())]
     if role not in allowed:
-        st.warning(f"ليس لديك صلاحية الوصول لهذه الصفحة. دورك: {role}")
+        st.warning(f"عذراً، لا تملك الصلاحية الكافية. الأدوار المسموحة: {', '.join(allowed)}")
         st.stop()
 
-# =========================
-# Login Required
-# =========================
+# ==========================================
+# 3. واجهة تسجيل الدخول
+# ==========================================
 def login_required():
+    """تفرض تسجيل الدخول وتعيد بيانات المستخدم كقاموس"""
     _ensure_session()
-
+    
+    # إذا كان مسجلاً بالفعل، نعود ببياناته
     if st.session_state.auth.get("ok") and st.session_state.user:
         return st.session_state.user
 
+    # عرض واجهة الدخول
     apply_branding("تقدير القيمة الإيجارية للعقارات الاستثمارية")
-
-    st.markdown("### 🔐 تسجيل الدخول")
-    col1, col2 = st.columns([2, 1])
-
+    st.markdown("---")
+    st.markdown("### 🔐 تسجيل الدخول للنظام")
+    
+    col1, col2 = st.columns([1, 1])
     with col1:
-        username = st.text_input("اسم المستخدم", key="login_username")
-        password = st.text_input("كلمة المرور", type="password", key="login_password")
-
-    with col2:
-        st.write("")
-        st.write("")
-        do_login = st.button("دخول", use_container_width=True)
-
-    if do_login:
+        username = st.text_input("اسم المستخدم", placeholder="ادخل اسم المستخدم...")
+        password = st.text_input("كلمة المرور", type="password", placeholder="ادخل كلمة المرور...")
+    
+    st.markdown(" ")
+    if st.button("تسجيل الدخول", use_container_width=True, type="primary"):
         admin_u, admin_p = _get_admin_creds()
-
-        if _constant_time_eq(username, admin_u) and _constant_time_eq(password, admin_p):
+        
+        # استخدام hmac للمقارنة الآمنة
+        if hmac.compare_digest(username, admin_u) and hmac.compare_digest(password, admin_p):
+            # إنشاء كائن المستخدم مع دور الأدمن
             user_info = {"username": username, "role": "admin"}
             st.session_state.auth = {"ok": True, "user": username}
             st.session_state.user = user_info
-            st.success("تم تسجيل الدخول بنجاح")
+            st.success("مرحباً بك! جاري تحويلك للوحة التحكم...")
             st.rerun()
         else:
-            st.error("بيانات الدخول غير صحيحة")
-
+            st.error("عذراً، اسم المستخدم أو كلمة المرور غير صحيحة.")
+    
     render_footer()
     st.stop()
