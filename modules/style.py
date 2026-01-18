@@ -133,11 +133,11 @@ def apply_branding(page_title: str = "تقدير القيمة الإيجارية
 def render_footer():
     st.markdown(
         """
-        <div style="margin-top:22px;padding:14px 10px;border-top:1px solid rgba(17,24,39,.10);opacity:.92">
-          <div><b>© محمد داغستاني 2026</b></div>
-          <div>مبادرة تطوير الأعمال بإشراف ودعم أ. عبدالرحمن خجا</div>
-          <div style="color:rgba(17,24,39,.70)">للاستخدام الداخلي – غير مخصص للنشر</div>
+        <div style="margin-top:40px;padding:14px 16px;border-top:1px solid rgba(0,0,0,.08);
+                    direction:rtl;text-align:center;opacity:.85;font-size:13px;">
+          © محمد داغستاني 2026 — مبادرة تطوير الأعمال بإشراف ودعم أ. عبدالرحمن خجا
         </div>
         """,
-        unsafe_allow_html=True,
+        unsafe_allow_html=True
     )
+
