@@ -42,4 +42,5 @@ def render_dashboard(user):
     render_footer()
 
 
-    render_rights_footer()
+st.markdown("---")
+st.caption("جميع الحقوق محفوظة © 2024 - نظام تقدير القيمة الإيجارية")
