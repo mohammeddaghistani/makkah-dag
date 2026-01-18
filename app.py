@@ -1,44 +1,31 @@
 import streamlit as st
-import time
-import logging
 
-# إعداد السجلات
-logging.basicConfig(filename='app_log.txt', level=logging.INFO, 
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+# يجب أن يكون إعداد الصفحة أول أمر في ملف app.py
+st.set_page_config(
+    page_title="تقدير القيمة الإيجارية للعقارات الاستثمارية",
+    page_icon="🏢",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
-def run_final_logic(input_data):
-    # محاكاة المنطق البرمجي الخاص بك
-    time.sleep(2)
-    logging.info(f"تمت معالجة: {input_data}")
-    return True
+from modules.db import init_db, ensure_settings
+from modules.auth import login_required
+from modules.dashboard import render_dashboard
 
-# تصميم الواجهة باستخدام Streamlit
-st.set_page_config(page_title="Makkah Dag System", page_icon="🕋", layout="centered")
+# 🔥 هذا يمنع إعادة تهيئة قاعدة البيانات كل مرة
+@st.cache_resource
+def init_database_once():
+    init_db()
+    ensure_settings()
 
-st.title("🕋 نظام مكة داغ لمعالجة البيانات")
-st.markdown("---")
+def main():
+    # تهيئة مرة واحدة فقط
+    init_database_once()
+    
+    user = login_required()
+    
+    if user:
+        render_dashboard(user)
 
-# حاوية الإدخال
-user_input = st.text_input("أدخل النص أو مسار البيانات:", placeholder="اكتب هنا...")
-uploaded_file = st.file_uploader("أو قم برفع ملف مباشرة", type=['txt', 'csv', 'xlsx'])
-
-if st.button("بدء التنفيذ"):
-    if user_input or uploaded_file:
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
-        status_text.text("جاري المعالجة...")
-        for percent_complete in range(100):
-            time.sleep(0.02)
-            progress_bar.progress(percent_complete + 1)
-        
-        target = user_input if user_input else uploaded_file.name
-        if run_final_logic(target):
-            status_text.text("الحالة: تم الإنجاز بنجاح!")
-            st.success(f"✅ تمت معالجة ({target}) بنجاح")
-            st.balloons()
-    else:
-        st.warning("الرجاء إدخال بيانات أولاً.")
-
-st.sidebar.title("إعدادات")
-st.sidebar.info("هذه النسخة مطورة لتعمل كواجهة ويب احترافية.")
+if __name__ == "__main__":
+    main()
