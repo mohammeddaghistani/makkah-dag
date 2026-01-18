@@ -1,96 +1,44 @@
-import customtkinter as ctk
-from tkinter import messagebox, filedialog
-import threading
-import logging
+import streamlit as st
 import time
+import logging
 
-# إعداد نظام تسجيل الأخطاء
+# إعداد السجلات
 logging.basicConfig(filename='app_log.txt', level=logging.INFO, 
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-class MakkahApp(ctk.CTk):
-    def __init__(self):
-        super().__init__()
+def run_final_logic(input_data):
+    # محاكاة المنطق البرمجي الخاص بك
+    time.sleep(2)
+    logging.info(f"تمت معالجة: {input_data}")
+    return True
 
-        # إعدادات النافذة الرئيسية
-        self.title("Makkah Dag Development - النسخة المطورة")
-        self.geometry("700x500")
-        ctk.set_appearance_mode("System") 
-        ctk.set_default_color_theme("blue")
+# تصميم الواجهة باستخدام Streamlit
+st.set_page_config(page_title="Makkah Dag System", page_icon="🕋", layout="centered")
 
-        # بناء واجهة المستخدم
-        self.setup_ui()
+st.title("🕋 نظام مكة داغ لمعالجة البيانات")
+st.markdown("---")
 
-    def setup_ui(self):
-        # العنوان الرئيسي
-        self.label = ctk.CTkLabel(self, text="نظام مكة داغ لمعالجة البيانات", font=("Segoe UI", 24, "bold"))
-        self.label.pack(pady=30)
+# حاوية الإدخال
+user_input = st.text_input("أدخل النص أو مسار البيانات:", placeholder="اكتب هنا...")
+uploaded_file = st.file_uploader("أو قم برفع ملف مباشرة", type=['txt', 'csv', 'xlsx'])
 
-        # حاوية الإدخال
-        self.frame = ctk.CTkFrame(self)
-        self.frame.pack(pady=10, padx=40, fill="x")
+if st.button("بدء التنفيذ"):
+    if user_input or uploaded_file:
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        status_text.text("جاري المعالجة...")
+        for percent_complete in range(100):
+            time.sleep(0.02)
+            progress_bar.progress(percent_complete + 1)
+        
+        target = user_input if user_input else uploaded_file.name
+        if run_final_logic(target):
+            status_text.text("الحالة: تم الإنجاز بنجاح!")
+            st.success(f"✅ تمت معالجة ({target}) بنجاح")
+            st.balloons()
+    else:
+        st.warning("الرجاء إدخال بيانات أولاً.")
 
-        self.entry = ctk.CTkEntry(self.frame, placeholder_text="اكتب نصاً أو اختر ملفاً للبدء...", width=400)
-        self.entry.pack(side="left", padx=10, pady=20)
-
-        self.btn_browse = ctk.CTkButton(self.frame, text="استعراض..", width=100, command=self.browse_file)
-        self.btn_browse.pack(side="right", padx=10)
-
-        # أزرار التحكم
-        self.btn_run = ctk.CTkButton(self, text="بدء التنفيذ"، font=("Segoe UI", 16), command=self.start_process_thread, fg_color="#2c3e50", hover_color="#34495e")
-        self.btn_run.pack(pady=20)
-
-        # شريط التقدم
-        self.progress = ctk.CTkProgressBar(self, width=500)
-        self.progress.pack(pady=10)
-        self.progress.set(0)
-
-        # منطقة الرسائل
-        self.status_label = ctk.CTkLabel(self, text="الحالة: جاهز"، font=("Segoe UI", 13))
-        self.status_label.pack(side="bottom", pady=20)
-
-    def browse_file(self):
-        filename = filedialog.askopenfilename()
-        if filename:
-            self.entry.delete(0, 'end')
-            self.entry.insert(0, filename)
-
-    def start_process_thread(self):
-        # فحص المدخلات قبل البدء
-        if not self.entry.get():
-            messagebox.showwarning("تنبيه", "الرجاء إدخال نص أو اختيار ملف أولاً")
-            return
-            
-        thread = threading.Thread(target=self.run_logic, daemon=True)
-        thread.start()
-
-    def run_logic(self):
-        try:
-            self.btn_run.configure(state="disabled")
-            self.status_label.configure(text="الحالة: جاري المعالجة...")
-            self.progress.start()
-
-            # --- هنا يتم تنفيذ منطق البرنامج ---
-            # مثال لعملية معالجة:
-            input_val = self.entry.get()
-            time.sleep(2) # محاكاة معالجة بيانات ثقيلة
-            
-            # تسجيل العملية
-            logging.info(f"تمت معالجة البيانات: {input_val}")
-            
-            # تحديث الواجهة عند الانتهاء
-            self.progress.stop()
-            self.progress.set(1)
-            self.status_label.configure(text="الحالة: تم الإنجاز بنجاح")
-            messagebox.showinfo("نجاح", "تمت المهمة وتحديث السجلات بنجاح")
-
-        except Exception as e:
-            logging.error(f"Error: {str(e)}")
-            messagebox.showerror("خطأ", f"حدث خطأ: {e}")
-            self.status_label.configure(text="الحالة: فشلت العملية")
-        finally:
-            self.btn_run.configure(state="normal")
-
-if __name__ == "__main__":
-    app = MakkahApp()
-    app.mainloop()
+st.sidebar.title("إعدادات")
+st.sidebar.info("هذه النسخة مطورة لتعمل كواجهة ويب احترافية.")
