@@ -79,7 +79,7 @@ def _nearby_deals(lat, lon, radius_km=15, limit=200):
 
 
 def valuation_ui(user):
-    require_role(["admin", "committee", "valuer", "data_entry"])
+    require_role(user, allowed_roles=["admin", "committee", "valuer", "data_entry"])
 
     st.subheader("التقييم")
 
